@@ -88,8 +88,15 @@ class SealDetection:
 		for i in CLASSES_FILTERED:results_filter.__delitem__(i) if not results_filter[i] else None
 
 		return results_filter
+
+	@staticmethod
+	def release():
+		'''
+			Empty cache cuda memory
+		'''
+		torch.cuda.empty_cache()
 	
-	def detection(self, image, image_size=320):
+	def detection(self, image, image_size=None):
 		'''
 		Prediction image object detectionn YoloV5
 		Args:
@@ -97,5 +104,6 @@ class SealDetection:
 		Return:
 			results_prediction(models.common.Detections) : results -> convert to (results.xyxy/resultsxywh)
 		'''
-		results = self.model(image, size=image_size)
+		if image_size: results = self.model(image, size=image_size)
+		else: results = self.model(image)
 		return results
