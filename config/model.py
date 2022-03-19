@@ -17,5 +17,5 @@ DETECTION_MODEL = {
 }
 
 #============================ CLASESS ======================================
-CLASSES_DETECTION   = ['seal', 'no_seal']
+CLASSES_DETECTION   = ['no_seal','seal']
 CLASSES_FILTERED    = ['seal']

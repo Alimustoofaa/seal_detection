@@ -1,11 +1,15 @@
 import os
+from urllib import response
 import cv2
 import time
+import requests
+
+from datetime import datetime
 from pathlib import Path
 from itertools import chain
 from src.app import SealDetection
 from .utils import logging, draw_rectangle, datetime_format, sending_file
-from config import ID_DEVICE, GATE
+from config import ID_DEVICE, GATE, IP_API, END_POINT
 
 class MainProcess:
     '''
@@ -58,8 +62,39 @@ class MainProcess:
         if sender:
             os.remove(path_image)
             
-        pass
+        return server_path
     
+    @staticmethod
+    def __send_api(server_path, start_time, end_time):
+        
+        #send json to API
+        result_json = {
+            'gateId'    : GATE,
+            'deviceId'  : ID_DEVICE,
+            'result'    : 0,
+            'box'       : 
+                {
+                'x_min': 10,
+                'y_min': 11,
+                'x_max': 12,
+                'y_max': 13
+            },
+            'filePath'  : server_path,
+            'startTime' : datetime.fromtimestamp(start_time),
+            'endTime'   : datetime.fromtimestamp(end_time),
+            'delayInSeconds' : 2
+            
+        }
+        response = requests.post(url = f'{IP_API}/{END_POINT}', data = result_json)
+        print(response)
+        try:
+            if response.status_code() == 200:
+                logging.info(f'Send API success')
+                return True
+        except:
+            logging.error('Cannot send data to API')
+            return False
+        
     def main(self, image, id=None):
         image_ori = image.copy()
         if not id: id = int(time.time())
@@ -75,7 +110,9 @@ class MainProcess:
         # Draw image and extract result
         for i in result_list:
             image_drawed = draw_rectangle(image_ori, i)
-            
+        
         # Save and sending file FTP
-        self.save_and_sending_file(image_drawed, id)
+        server_path = self.save_and_sending_file(image_drawed, id)
+        # send data to API
+        self.__send_api(server_path, start_time=id, end_time=id)
         return image_drawed
