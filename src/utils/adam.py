@@ -1,35 +1,32 @@
 from config import IP, USERNAME, PASSWORD
-from adam_io import Adam6050D, DigitalOutput
+from adam_io import Adam6050D
 
-class Adam6060Output:
+class Adam6050Input:
     def __init__(self):
         self.adam           = Adam6050D(IP, USERNAME, PASSWORD)
-        self.initial_array  = [1,1,1,1,1,1]
-        self.dig_out        = DigitalOutput(array=self.initial_array)
         
-    def di_output(self, di=None):
+    def di_input(self, di=None):
         '''
         digital output adam,
         and convert digital output to bolean (True/False)
         Args:
-            di = Optional -> 1,2,3,4,5,6
+            di = Optional -> 0, 1,2,3,4,5,6
         return:
             output = True/False
             
         '''
         dig_in = self.adam.input(0)
-        if dig_in[di-1] == 0: return False
+        if dig_in[di] == 0: return False
         else: return True
 
-    def di_outputs(self):
+    def di_inputs(self):
         '''
-        digital output adam,
-        and convert digital output to bolean (True/False)
-        Args:
-            di = Optional -> 1,2,3,4,5,6
+        digital input adam,
+        and convert digital input to bolean (True/False)
+        
         return:
             output = List[True/False]
         '''
-        dig_in = self.adam.input(0)
-        output = [False if i==0 else True for i in dig_in]
+        dig_in = self.adam.input()
+        output = [False if i[1]==0 else True for i in dig_in]
         return output

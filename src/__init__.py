@@ -39,7 +39,7 @@ class MainProcess:
                 extract_result(results=results, min_confidence=threshold)
         return result
     
-    def save_and_sending_file(self, file, id_file):
+    def __save_and_sending_file(self, file, id_file):
         '''
             Send image to server
             Args:
@@ -112,7 +112,9 @@ class MainProcess:
             image_drawed = draw_rectangle(image_ori, i)
         
         # Save and sending file FTP
-        server_path = self.save_and_sending_file(image_drawed, id)
+        try: server_path = self.__save_and_sending_file(image_drawed, id)
+        except: pass
         # send data to API
-        self.__send_api(server_path, start_time=id, end_time=id)
+        try: self.__send_api(server_path, start_time=id, end_time=id)
+        except: pass
         return image_drawed
