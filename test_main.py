@@ -1,76 +1,61 @@
-# # import cv2
-# # from src import MainProcess
 
-# # app = MainProcess()
 
-# # image = cv2.imread('images/1.jpg')
-# # app.main(image)
-import json
-# import time
-# import requests
-# from config import *
+import cv2
+import time
+from adam_io import DigitalOutput
+from src.utils import Adam6050DInput, logging
+from src.utils.camera import Camera
+from adam_io import DigitalOutput
 
-# from datetime import datetime
+class RunApplication:
+	def __init__(self):		
+		self.camera      	= Camera(camera_id=0, flip_method=2)
+		self.camera_run  	= self.camera.run()
+		self.adam			= Adam6050DInput()
+		self.current_B1		= 1
+		self.delay_time		= 2
+		self.start_time		= 0
+	
+	def __write_video(self, filename):
+		size = (int(self.camera_run.get(4)), int(self.camera_run.get(3)))
+		return cv2.VideoWriter(f'{filename}.avi',cv2.VideoWriter_fourcc(*'XVID'), 20, (1080,1920))
 
-# def __send_api(server_path, start_time=time.time(), end_time=time.time()):
-#         headers = {
-#             'accept': '*/*',
-#             'Content-Type': 'application/json',
-#         }
-#         #send json to API
-#         result_json = {
-#             'gateId'    : '09',
-#             'deviceId'  : 'sealdetection09',
-#             'result'    : 0,
-#             'box'       : 
-#                 {
-#                 'x_min': 10,
-#                 'x_max': 11,
-#                 'y_min': 12,
-#                 'y_max': 13
-#             },
-#             'filePath'  : server_path,
-#             'startTime' : str(datetime.fromtimestamp(start_time)),
-#             'endTime'   : str(datetime.fromtimestamp(end_time)),
-#             'delayInSeconds' : 2
-            
-#         }
-#         response = requests.post(url = f'{IP_API}/{END_POINT}', headers=headers, data = result_json)
-#         print(response)
-#         try:
-#             response = requests.post(url = f'{IP_API}/{END_POINT}', data = result_json)
-#             if response.status_code() == 200:
-#                 print(f'Send API success')
-#                 return True
-#         except:
-#             print('Cannot send data to API')
-#             return False
-        
-# print(__send_api('/test'))
+	def run(self):
+		logging.info('Starting Application')
+		while True:
+			adam_inputs = self.adam.di_inputs()
+			B1 			= adam_inputs[2][1]
 
-import requests
+			# Condition Trigger on lamp D0, D2
+			if self.current_B1 == 1 and B1 == 0:
+				self.adam.di_output(DigitalOutput(array=[0,0,1,0,0,0]))
 
-headers = {
-    'accept': '*/*',
-    'Content-Type': 'application/json',
-}
+			# Condition read camera:
+			if self.current_B1 == 0 and B1 == 1:
+				if self.start_time == 0: time.time()
+				while True:
+					ret, frame = self.camera_run.read()
+					if not ret:
+						self.camera.release(ret=False)
+						self.capture = self.camera.run()
+						time.sleep(1)
+						continue
+					if time.time() - self.start_time >= self.delay_time:
+						logging.info('Capture camera')
+						frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+						cv2.imwrite('frame.jpg', frame)
+						#drawed = self.app.main(frame, id=int(time.time()))
+						#cv2.imwrite('result.jpg', drawed)
+						self.adam.di_output(DigitalOutput(array=[0,0,0,0,0,0]))
+						self.start_time = 0; break
+						
+			self.current_B1 = B1
+			key = cv2.waitKey(30)
+			if key == 27: break
 
-json_data = {
-    'gateId': 'gate09',
-    'deviceId': '1',
-    'result': 2,
-    'confidence': 90,
-    'box': {
-        'x_min': 0,
-        'x_max': 0,
-        'y_min': 0,
-        'y_max': 0,
-    },
-    'filePath': 'string',
-    "startTime": "2022-03-19T08:49:28.315Z",
-    "EndTime": "2022-03-19T08:49:28.315Z",
-    'delayInSeconds': 9,
-}
-print(json.dumps(json_data))
-response = requests.post('https://3973-114-4-83-199.ngrok.io/api/v1/seal', headers=headers, json=json_data)
-print(response.text)
+		self.camera.release()
+
+if __name__ == '__main__':
+	application  = RunApplication()
+	application.run()
+

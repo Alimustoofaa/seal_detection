@@ -15,7 +15,8 @@ class RunApplication:
 		self.adam			= Adam6050DInput()
 		self.app         	= MainProcess()
 		self.current_B1		= 1
-		self.delay_time		= 2
+		self.delay_time		= 3
+		self.start_time		= 0
 	
 	def __write_video(self, filename):
 		size = (int(self.camera_run.get(4)), int(self.camera_run.get(3)))
@@ -30,20 +31,25 @@ class RunApplication:
 			# Condition Trigger on lamp D0, D2
 			if self.current_B1 == 1 and B1 == 0:
 				self.adam.di_output(DigitalOutput(array=[0,0,1,0,0,0]))
+
 			# Condition read camera:
-			if self.current_B1 == 1 and B1 == 0:
-				start_time = time.time()
-				ret, frame = self.camera_run.read()
-				if not ret:
-					self.camera.release(ret=False)
-					self.capture = self.camera.run()
-					time.sleep(1)
-					continue
-				if time.time()-start_time >= self.delay_time:
-					logging.info('Capture camera')
-					frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
-					self.app.main(frame)
-					self.adam.di_output(DigitalOutput(array=[0,0,0,0,0,0]))
+			if self.current_B1 == 0 and B1 == 1:
+				if self.start_time == 0: time.time()
+				while time.time() - self.start_time >= self.delay_time:
+					ret, frame = self.camera_run.read()
+					if not ret:
+						self.camera.release(ret=False)
+						self.capture = self.camera.run()
+						time.sleep(1)
+						continue
+					if time.time() - self.start_time >= self.delay_time:
+						logging.info('Capture camera')
+						frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+						drawed = self.app.main(frame, id=int(time.time()))
+						cv2.imwrite('test.jpg', drawed)
+						self.adam.di_output(DigitalOutput(array=[0,0,0,0,0,0]))
+						self.start_time = 0; break
+						
 			self.current_B1 = B1
 			key = cv2.waitKey(30)
 			if key == 27: break

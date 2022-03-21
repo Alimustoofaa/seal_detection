@@ -32,7 +32,7 @@ class Camera:
 		wbmode=7 gainrange="10 10" ispdigitalgainrange="8 8" exposuretimerange="4200000 4200000"
 		'''
 		return (
-			"nvarguscamerasrc sensor-id=%d ! "
+			'nvarguscamerasrc sensor-id=%d gainrange="10 10" exposuretimerange="7000000 7000000" ! '
 			"video/x-raw(memory:NVMM), "
 			"width=(int)%d, height=(int)%d, "
 			"format=(string)NV12, framerate=(fraction)%d/1 ! "
