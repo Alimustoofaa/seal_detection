@@ -28,6 +28,9 @@ class Camera:
 		framerate=30,
 		flip_method=0,
 	):
+		'''
+		wbmode=7 gainrange="10 10" ispdigitalgainrange="8 8" exposuretimerange="4200000 4200000"
+		'''
 		return (
 			"nvarguscamerasrc sensor-id=%d ! "
 			"video/x-raw(memory:NVMM), "

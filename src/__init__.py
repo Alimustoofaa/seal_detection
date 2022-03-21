@@ -58,9 +58,9 @@ class MainProcess:
         
         # Send file to FTP server
         server_path = f'{GATE}/{ID_DEVICE}/{year}-{month}-{day}_{hour}'
-        sender = sending_file(file_name=file_name, server_path=server_path)
-        if sender:
-            os.remove(path_image)
+        #sender = sending_file(file_name=file_name, server_path=server_path)
+        #if sender:
+         #   os.remove(path_image)
             
         return server_path
     
@@ -99,14 +99,15 @@ class MainProcess:
         image_ori = image.copy()
         if not id: id = int(time.time())
         # Detection seal
-        result = self.__detection(image, size=None, threshold=0.4)
+        result = self.__detection(image, size=360, threshold=0.2)
         if not result: logging.info(f'Seal not found'); image_drawed = image_ori 
-        else: logging.info('Seal Found')
+        else: logging.info(f'Seal Found : {result}')
         
         # Extract result to list
         result_list = [[[x['bbox'], key,  x['confidence']] for x in value]\
                       for key, value in result.items()]
         result_list = list(chain(*result_list))
+
         # Draw image and extract result
         for i in result_list:
             image_drawed = draw_rectangle(image_ori, i)
@@ -114,6 +115,7 @@ class MainProcess:
         # Save and sending file FTP
         try: server_path = self.__save_and_sending_file(image_drawed, id)
         except: pass
+        
         # send data to API
         try: self.__send_api(server_path, start_time=id, end_time=id)
         except: pass

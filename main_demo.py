@@ -1,58 +1,58 @@
 import cv2
 import time
-
 from src import MainProcess
+from adam_io import DigitalOutput
+from src.utils import Adam6050DInput
 from src.utils.camera import Camera
-from src.utils import Adam6060Output
-
-from src.utils import logging
-
+from adam_io import DigitalOutput
 
 class RunApplication:
 	def __init__(self):		
 		self.camera      	= Camera(camera_id=0, flip_method=2)
-		self.camera_run  	= self.camera .run()
+		self.camera_run  	= self.camera.run()
+		self.adam			= Adam6050DInput()
 		self.app         	= MainProcess()
-		self.skip_frame  	= True
-		#self.out		= self.__write_video('demo_video_4')
-
+		self.current_B1		= 1
+		self.next_frame		= 2
 	
 	def __write_video(self, filename):
-		size = (int(self.camera_run.get(3)), int(self.camera_run.get(4)))
-		return cv2.VideoWriter(f'{filename}.avi',cv2.VideoWriter_fourcc(*'XVID'), 10, size)
+		size = (int(self.camera_run.get(4)), int(self.camera_run.get(3)))
+		return cv2.VideoWriter(f'{filename}.avi',cv2.VideoWriter_fourcc(*'XVID'), 20, (1080,1920))
 
 	def run(self):
-		start_time 	= time.time()
-		timestamp	= int(start_time)
-  
-		logging.info(f'======== Seal Detection Started ========')
-		logging.info(f'Id : {timestamp}')
-
-		# frame = cv2.imread('files/test_image.jpg')
-
-		# # Process detection seal
-		# drawed = self.app.main(frame)
-
+		# Condition start capture and running app
+		print('Starting Application')
 		while True:
+			adam_inputs = self.adam.di_inputs()
+			B1 			= adam_inputs[2][1]
+
 			ret, frame = self.camera_run.read()
 			if not ret:
-				logging.error(f'Message : Error reading frame')
 				self.camera.release(ret=False)
 				self.capture = self.camera.run()
 				time.sleep(1)
+				continue
 			else:
-				if not self.skip_frame:
-					drawed = self.app.main(image=frame, id=timestamp);break
-					#self.out.write(drawed)
-					self.skip_frame = True
-				else: self.skip_frame = False
-			
-			key_window = self.camera.show(drawed)
-			if key_window == 27: break
+				if self.current_B1 == 1 and B1 == 0:
+					self.adam.di_output(DigitalOutput(array=[1,0,1,0,0,0]))
+				if self.current_B1 == 0 and B1 == 1:
+					time_start = int(time.time())
+					frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+					#if self.next_frame == True:
+					print('Capture Photo')
+					drawed = self.app.main(frame, id=time_start)
+					#cv2.imwrite(f'{time_start}.jpg', drawed)
+					time.sleep(2)
+					self.adam.di_output(DigitalOutput(array=[0,0,0,0,0,0]))
+				#key_window = self.camera.show(resized)
+			#self.adam.di_output(DigitalOutput(array=[0,0,0,0,0,0]))
+			self.current_B1 = B1
+			key = cv2.waitKey(30)
+			if key == 27: break
 
-		self.out.release()
 		self.camera.release()
 
 if __name__ == '__main__':
-	aplication  = RunApplication()
-	aplication.run()
+	application  = RunApplication()
+	application.run()
+

@@ -1,72 +1,56 @@
+
+
 import cv2
 import time
-
 from src import MainProcess
+from adam_io import DigitalOutput
+from src.utils import Adam6050DInput, logging
 from src.utils.camera import Camera
-from src.utils import Adam6050Input
-
-from src.utils import logging
-
+from adam_io import DigitalOutput
 
 class RunApplication:
 	def __init__(self):		
-		self.camera      	= Camera(camera_id=0, flip_method=2, camera_pipeline=False)
+		self.camera      	= Camera(camera_id=0, flip_method=2)
 		self.camera_run  	= self.camera.run()
-		self.adam_input		= Adam6050Input()
+		self.adam			= Adam6050DInput()
 		self.app         	= MainProcess()
-		self.prev_input		= list()
-		self.skip_frame  	= False
-		self.count_frame 	= 0
-
+		self.current_B1		= 1
+		self.delay_time		= 2
 	
 	def __write_video(self, filename):
-		size = (int(self.camera_run.get(3)), int(self.camera_run.get(4)))
-		return cv2.VideoWriter(f'{filename}.avi',cv2.VideoWriter_fourcc(*'XVID'), 10, size)
+		size = (int(self.camera_run.get(4)), int(self.camera_run.get(3)))
+		return cv2.VideoWriter(f'{filename}.avi',cv2.VideoWriter_fourcc(*'XVID'), 20, (1080,1920))
 
-	def __trigger_camera(self):
-		input_list = self.adam_input.di_inputs()
-		if not self.prev_input == input_list:
-			if not self.prev_input[4] and input_list:
-				trigger = True
-			self.prev_input = input_list
-		else: trigger = True
-		return trigger
-		 
 	def run(self):
-		
-		start_time 	= time.time()
-		timestamp	= int(start_time)
-  
-		logging.info(f'======== Damage Detection Started ========')
-		logging.info(f'Id : {timestamp}')
-
-		# Define Write Video
-		#out_video =  self.__write_video(timestamp)
-
+		logging.info('Starting Application')
 		while True:
-			#if self.__trigger_camera():
-			ret, frame = self.camera_run.read()
-			if not ret:
-				logging.error(f'Message : Error reading frame')
-				self.camera.release(ret=False)
-				self.capture = self.camera.run()
-				time.sleep(1)
-			else:
-				if not self.skip_frame:
-					if self.count_frame == 2:
-						print(cv2.imwrite('test.jpg', frame));break
-					else: self.count_frame+=1
-					drawed = self.app.main(frame)
-						#out_video.write(drawed)
-					self.skip_frame = True
-				else: self.skip_frame = False; continue
-			
-				key_window = self.camera.show(drawed)
-				if key_window == 27: break
+			adam_inputs = self.adam.di_inputs()
+			B1 			= adam_inputs[2][1]
 
-		self.out.release()
+			# Condition Trigger on lamp D0, D2
+			if self.current_B1 == 1 and B1 == 0:
+				self.adam.di_output(DigitalOutput(array=[0,0,1,0,0,0]))
+			# Condition read camera:
+			if self.current_B1 == 1 and B1 == 0:
+				start_time = time.time()
+				ret, frame = self.camera_run.read()
+				if not ret:
+					self.camera.release(ret=False)
+					self.capture = self.camera.run()
+					time.sleep(1)
+					continue
+				if time.time()-start_time >= self.delay_time:
+					logging.info('Capture camera')
+					frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+					self.app.main(frame)
+					self.adam.di_output(DigitalOutput(array=[0,0,0,0,0,0]))
+			self.current_B1 = B1
+			key = cv2.waitKey(30)
+			if key == 27: break
+
 		self.camera.release()
 
 if __name__ == '__main__':
-	aplication  = RunApplication()
-	aplication.run()
+	application  = RunApplication()
+	application.run()
+
