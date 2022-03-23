@@ -9,7 +9,15 @@ from pathlib import Path
 from itertools import chain
 from src.app import SealDetection
 from .utils import logging, draw_rectangle, datetime_format, sending_file
-from config import ID_DEVICE, GATE, IP_API, END_POINT
+
+from config import DEVICE_ID, GATE_ID,END_POINT,SEND_TIMEOUT,READ_TIMEOUT
+from config import DATETIME_FORMAT,TIMEID_FORMAT,DELAY_IN_SECONDS,FTP_HOST, USER_NAME, USER_PASSWD
+
+from io import BytesIO
+import ftplib
+import requests
+from requests.exceptions import HTTPError
+from datetime import datetime
 
 class MainProcess:
 	'''
@@ -39,7 +47,7 @@ class MainProcess:
 				extract_result(results=results, min_confidence=threshold)
 		return result
 	
-	def __save_and_sending_file(self, file, id_file):
+	""" def __save_and_sending_file(self, file, id_file):
 		'''
 			Send image to server
 			Args:
@@ -94,11 +102,87 @@ class MainProcess:
 				return True
 		except:
 			logging.error('Cannot send data to API')
-			return False
-		
-	def main(self, image, id=None):
+			return False """
+	def chdir(self,ftp_path, ftp_conn):
+		dirs = [d for d in ftp_path.split('/') if d != '']
+		for p in dirs:
+			self.check_dir(p, ftp_conn)
+
+
+	def check_dir(dir, ftp_conn):
+		filelist = []
+		ftp_conn.retrlines('LIST', filelist.append)
+		found = False
+
+		for f in filelist:
+			if f.split()[-1] == dir and f.lower().startswith('d'):
+				found = True
+
+		if not found:
+			ftp_conn.mkd(dir)
+		ftp_conn.cwd(dir)
+
+	def img_upload(self,img,time_id):
+		try:
+			year, month, day, hour, _, _,_ = datetime_format()
+			dest_path = f'/{GATE_ID}/{year}/{month}/{day}/'
+			"""Transfer file to FTP."""
+			# Connect
+			session = ftplib.FTP(FTP_HOST, USER_NAME, USER_PASSWD)
+			session.set_pasv(False)
+			# Change to target dir
+			self.chdir(dest_path,session)
+
+			# Transfer file
+			name = time_id.strftime(TIMEID_FORMAT)[:-4]
+			file_name  = f'{DEVICE_ID}{name}.jpg'
+			logging.info("Transferring %s to %s..." % (file_name,dest_path))
+			print("Transferring %s to %s..." % (file_name,dest_path))
+			#using memory, can also use file
+			retval, buffer = cv2.imencode('.jpg', img)
+			flo = BytesIO(buffer)
+			session.storbinary('STOR %s' % os.path.basename(dest_path+file_name), flo)
+			
+			# Close session
+			session.quit()
+			return dest_path+file_name
+		except:
+			logging.info('error: upload file error')
+			return 'error: upload file error'
+	def send_data(self,result, confidence, file_path, start_time, end_time): 
+		try:
+			url= END_POINT+'seal/'
+			x_min_c=y_min_c=x_max_c=y_max_c=0
+			json_data = {
+				'gateId': GATE_ID,
+				'deviceId': DEVICE_ID,
+				'result': result,
+				'confidence': confidence,
+				'box' : {
+					"x_min": x_min_c,
+					"y_min": y_min_c,
+					"x_max": x_max_c,
+					"y_max": y_max_c
+				},
+				'filePath': file_path,
+				'startTime': start_time.strftime(DATETIME_FORMAT),
+				'EndTime': end_time.strftime(DATETIME_FORMAT),
+				'delayInSeconds' : DELAY_IN_SECONDS,
+			}
+			print('sending...')
+			print(json_data)
+			headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+			r = requests.post(url=url,json=json_data,headers=headers,timeout=(SEND_TIMEOUT,READ_TIMEOUT))
+			ret = r.json()
+			return ret
+		except HTTPError as e:
+			print(e.response.text)
+		except:
+			return 'send error'
+
+	def main(self, image):
 		image_ori = image.copy()
-		if not id: id = int(time.time())
+		if not id: id = datetime.now()
 		# Detection seal
 		result = self.__detection(image, size=360, threshold=0.2)
 		if not result: logging.info(f'Seal not found'); image_drawed = image_ori 
@@ -113,11 +197,17 @@ class MainProcess:
 		for i in result_list:
 			image_drawed = draw_rectangle(image_ori, i)
 		
-		# Save and sending file FTP
+		""" # Save and sending file FTP
 		try: server_path = self.__save_and_sending_file(image_drawed, id)
 		except: pass
 		
 		# send data to API
 		try: self.__send_api(server_path, start_time=id, end_time=id)
-		except: pass
+		except: pass """
+		
+		path = self.img_upload(image_drawed,id)
+		if 'error' in path :
+			path=''
+		end_time = datetime.now()
+		self.send_data(1 if result else 0,0,path,id,end_time)
 		return image_drawed
