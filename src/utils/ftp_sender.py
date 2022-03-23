@@ -1,5 +1,5 @@
 from ftplib import FTP
-from config import IP_FTP, USER_NAME, USER_PASSWD
+from config import FTP_HOST, USER_NAME, USER_PASSWD
 
 def sending_file(file_name, server_path=None):
 	'''
@@ -9,7 +9,7 @@ def sending_file(file_name, server_path=None):
 		folder_name = folder name
 	'''
 	
-	ftp = FTP(IP_FTP)
+	ftp = FTP(FTP_HOST)
 	ftp.login(USER_NAME, USER_PASSWD)
 	if server_path is not None:
 		try: 
