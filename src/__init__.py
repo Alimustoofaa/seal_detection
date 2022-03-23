@@ -1,23 +1,20 @@
 import os
-from urllib import response
 import cv2
 import time
-import requests
-
-from datetime import datetime
-from pathlib import Path
-from itertools import chain
-from src.app import SealDetection
-from .utils import logging, draw_rectangle, datetime_format, sending_file
-
-from config import DEVICE_ID, GATE_ID,END_POINT,SEND_TIMEOUT,READ_TIMEOUT
-from config import DATETIME_FORMAT,TIMEID_FORMAT,DELAY_IN_SECONDS,FTP_HOST, USER_NAME, USER_PASSWD
-
-from io import BytesIO
 import ftplib
 import requests
-from requests.exceptions import HTTPError
+
+from io import BytesIO
+from itertools import chain
 from datetime import datetime
+from src.app import SealDetection
+from requests.exceptions import HTTPError
+from .utils import logging, draw_rectangle, datetime_format
+
+from config import DEVICE_ID, GATE_ID,END_POINT,\
+	SEND_TIMEOUT,READ_TIMEOUT, DATETIME_FORMAT,\
+	TIMEID_FORMAT,DELAY_IN_SECONDS, FTP_HOST, USER_NAME, USER_PASSWD
+
 
 class MainProcess:
 	'''
@@ -109,7 +106,7 @@ class MainProcess:
 			self.check_dir(p, ftp_conn)
 
 
-	def check_dir(dir, ftp_conn):
+	def check_dir(self, dir, ftp_conn):
 		filelist = []
 		ftp_conn.retrlines('LIST', filelist.append)
 		found = False
@@ -137,7 +134,6 @@ class MainProcess:
 			name = time_id.strftime(TIMEID_FORMAT)[:-4]
 			file_name  = f'{DEVICE_ID}{name}.jpg'
 			logging.info("Transferring %s to %s..." % (file_name,dest_path))
-			print("Transferring %s to %s..." % (file_name,dest_path))
 			#using memory, can also use file
 			retval, buffer = cv2.imencode('.jpg', img)
 			flo = BytesIO(buffer)
@@ -149,6 +145,7 @@ class MainProcess:
 		except:
 			logging.info('error: upload file error')
 			return 'error: upload file error'
+
 	def send_data(self,result, confidence, file_path, start_time, end_time): 
 		try:
 			url= END_POINT+'seal/'
@@ -169,11 +166,11 @@ class MainProcess:
 				'EndTime': end_time.strftime(DATETIME_FORMAT),
 				'delayInSeconds' : DELAY_IN_SECONDS,
 			}
-			print('sending...')
-			print(json_data)
+			logging.info(f'sending... : {json_data}')
 			headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 			r = requests.post(url=url,json=json_data,headers=headers,timeout=(SEND_TIMEOUT,READ_TIMEOUT))
 			ret = r.json()
+			logging.info(f'{ret}')
 			return ret
 		except HTTPError as e:
 			print(e.response.text)
